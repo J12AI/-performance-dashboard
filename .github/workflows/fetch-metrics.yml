@@ -1,0 +1,38 @@
+name: Fetch Instagram Metrics
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch Instagram metrics
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_BUSINESS_ID: ${{ secrets.IG_BUSINESS_ID }}
+        run: python scripts/fetch_metrics.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "j12-metrics-bot"
+          git config user.email "actions@github.com"
+          git add data/videos.json data/history.jsonl
+          git diff --staged --quiet || git commit -m "Update metrics — $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
