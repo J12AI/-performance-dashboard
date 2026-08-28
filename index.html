@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J12 Performance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#111111;
+    --panel:#1A1D24;
+    --panel-2:#15171D;
+    --border:rgba(245,244,240,0.09);
+    --text:#F5F4F0;
+    --muted:rgba(245,244,240,0.58);
+    --accent:#5B8DEF;
+    --accent-dim:rgba(91,141,239,0.15);
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',-apple-system,sans-serif;
+    margin:0;
+    padding:32px;
+  }
+  h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;margin:0;}
+  .eyebrow{
+    font-family:'Space Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:6px;
+  }
+  .header{margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-end;}
+  .header h1{font-size:32px;}
+  .header .updated{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;}
+  .subhead{color:var(--muted);font-size:13px;margin:8px 0 28px;}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px;}
+  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .stat-card .label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+  .stat-card .value{font-size:24px;font-weight:700;margin-top:6px;}
+
+  .toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+  select, input[type=text]{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:8px 12px;font-size:13px;font-family:'Inter',sans-serif;
+  }
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;}
+  .card{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    overflow:hidden;cursor:pointer;transition:border-color .15s;
+  }
+  .card:hover{border-color:var(--accent);}
+  .thumb{width:100%;aspect-ratio:9/16;background:var(--panel-2);object-fit:cover;display:block;}
+  .card-body{padding:12px 14px;}
+  .card-caption{font-size:12px;color:var(--text);line-height:1.4;max-height:34px;overflow:hidden;margin-bottom:8px;}
+  .card-date{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:8px;}
+  .metric-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;}
+  .metric-row .primary{color:var(--accent);font-weight:700;}
+
+  .empty-state, .loading{color:var(--muted);text-align:center;padding:60px 0;font-size:13px;}
+
+  /* Modal */
+  .modal-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);
+    align-items:center;justify-content:center;z-index:50;padding:20px;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;
+  }
+  .modal-close{float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
+  .modal h2{font-size:20px;margin-bottom:4px;}
+  .modal .meta{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:18px;}
+  .modal-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+  .modal-stats .mstat{background:var(--panel-2);border-radius:8px;padding:10px 12px;}
+  .modal-stats .mstat .l{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;text-transform:uppercase;}
+  .modal-stats .mstat .v{font-size:18px;font-weight:700;margin-top:3px;}
+  .modal a.permalink{color:var(--accent);font-size:12px;text-decoration:none;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="eyebrow">J12 · Content OS</div>
+    <h1>Performance Dashboard</h1>
+  </div>
+  <div class="updated" id="lastUpdated">—</div>
+</div>
+<div class="subhead">Live from Instagram Graph API · updated automatically once a day</div>
+
+<div id="loading" class="loading">Loading data…</div>
+<div id="app" style="display:none;">
+
+  <div class="stat-grid" id="statGrid"></div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Search captions…">
+    <select id="sortBy">
+      <option value="views">Sort: Views</option>
+      <option value="saves">Sort: Saves</option>
+      <option value="likes">Sort: Likes</option>
+      <option value="timestamp">Sort: Newest</option>
+    </select>
+  </div>
+
+  <div class="grid" id="videoGrid"></div>
+  <div id="emptyState" class="empty-state" style="display:none;">No data yet — waiting on the first automated fetch.</div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+let videos = [];
+let history = [];
+
+function fmt(n){
+  n = Number(n) || 0;
+  if(n >= 1000000) return (n/1000000).toFixed(1)+'M';
+  if(n >= 1000) return (n/1000).toFixed(1)+'K';
+  return n;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+async function load(){
+  try{
+    const vRes = await fetch('data/videos.json?_=' + Date.now());
+    videos = vRes.ok ? await vRes.json() : [];
+  }catch(e){ videos = []; }
+
+  try{
+    const hRes = await fetch('data/history.jsonl?_=' + Date.now());
+    if(hRes.ok){
+      const text = await hRes.text();
+      history = text.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+    }
+  }catch(e){ history = []; }
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  if(videos.length){
+    const latest = videos.reduce((a,v)=> (v.last_updated > a ? v.last_updated : a), videos[0].last_updated || '');
+    document.getElementById('lastUpdated').textContent = 'Last updated: ' + (latest ? new Date(latest).toLocaleString() : '—');
+  }
+
+  renderStats();
+  renderGrid();
+}
+
+function renderStats(){
+  const totalViews = videos.reduce((a,v)=>a+Number(v.metrics.views||0),0);
+  const totalLikes = videos.reduce((a,v)=>a+Number(v.metrics.likes||0),0);
+  const totalSaves = videos.reduce((a,v)=>a+Number(v.metrics.saves||0),0);
+  const totalComments = videos.reduce((a,v)=>a+Number(v.metrics.comments||0),0);
+
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat-card"><div class="label">Videos</div><div class="value">${videos.length}</div></div>
+    <div class="stat-card"><div class="label">Total Views</div><div class="value">${fmt(totalViews)}</div></div>
+    <div class="stat-card"><div class="label">Total Likes</div><div class="value">${fmt(totalLikes)}</div></div>
+    <div class="stat-card"><div class="label">Total Saves</div><div class="value">${fmt(totalSaves)}</div></div>
+    <div class="stat-card"><div class="label">Total Comments</div><div class="value">${fmt(totalComments)}</div></div>
+  `;
+}
+
+function renderGrid(){
+  const searchVal = document.getElementById('search').value.toLowerCase();
+  const sortBy = document.getElementById('sortBy').value;
+
+  let filtered = videos.filter(v => (v.caption||'').toLowerCase().includes(searchVal));
+  filtered.sort((a,b)=>{
+    if(sortBy === 'timestamp') return (b.timestamp||'').localeCompare(a.timestamp||'');
+    return Number(b.metrics[sortBy]||0) - Number(a.metrics[sortBy]||0);
+  });
+
+  const gridEl = document.getElementById('videoGrid');
+  const emptyEl = document.getElementById('emptyState');
+
+  if(filtered.length === 0){
+    gridEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  gridEl.innerHTML = filtered.map(v => `
+    <div class="card" onclick="openModal('${v.id}')">
+      <img class="thumb" src="${v.thumbnail_url || ''}" loading="lazy" onerror="this.style.opacity=0">
+      <div class="card-body">
+        <div class="card-caption">${escapeHtml((v.caption||'Untitled').slice(0,60))}</div>
+        <div class="card-date">${v.timestamp ? new Date(v.timestamp).toLocaleDateString() : ''}</div>
+        <div class="metric-row">
+          <span class="primary">${fmt(v.metrics.views)} views</span>
+          <span>${fmt(v.metrics.saves)} saves</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+let trendChartInstance;
+
+window.openModal = function(id){
+  const v = videos.find(x => x.id === id);
+  if(!v) return;
+
+  const m = v.metrics;
+  document.getElementById('modalContent').innerHTML = `
+    <h2>${escapeHtml((v.caption||'Untitled').slice(0,90))}</h2>
+    <div class="meta">${v.timestamp ? new Date(v.timestamp).toLocaleString() : ''} · ${v.media_product_type || v.media_type || ''}</div>
+    <div class="modal-stats">
+      <div class="mstat"><div class="l">Views</div><div class="v">${fmt(m.views)}</div></div>
+      <div class="mstat"><div class="l">Reach</div><div class="v">${fmt(m.reach)}</div></div>
+      <div class="mstat"><div class="l">Likes</div><div class="v">${fmt(m.likes)}</div></div>
+      <div class="mstat"><div class="l">Comments</div><div class="v">${fmt(m.comments)}</div></div>
+      <div class="mstat"><div class="l">Shares</div><div class="v">${fmt(m.shares)}</div></div>
+      <div class="mstat"><div class="l">Saves</div><div class="v">${fmt(m.saves)}</div></div>
+      ${m.avg_watch_time_sec != null ? `<div class="mstat"><div class="l">Avg Watch Time</div><div class="v">${m.avg_watch_time_sec}s</div></div>` : ''}
+    </div>
+    <canvas id="trendCanvas" height="120"></canvas>
+    <div style="margin-top:16px;">
+      ${v.permalink ? `<a class="permalink" href="${v.permalink}" target="_blank">View on Instagram →</a>` : ''}
+    </div>
+  `;
+  document.getElementById('modalBackdrop').classList.add('open');
+
+  const rows = history.filter(h => h.id === id).sort((a,b)=> a.date.localeCompare(b.date));
+  const ctx = document.getElementById('trendCanvas');
+  if(trendChartInstance) trendChartInstance.destroy();
+  trendChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: rows.length ? rows.map(r => new Date(r.date).toLocaleDateString()) : ['No history yet'],
+      datasets: [{
+        label: 'Views over time',
+        data: rows.length ? rows.map(r => r.views) : [0],
+        borderColor: '#5B8DEF',
+        backgroundColor: 'rgba(91,141,239,0.12)',
+        fill: true, tension: 0.3, pointRadius: 3,
+      }]
+    },
+    options: {
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'rgba(245,244,240,0.58)',font:{size:10}},grid:{color:'rgba(245,244,240,0.06)'}},
+        y:{ticks:{color:'rgba(245,244,240,0.58)',font:{size:10}},grid:{color:'rgba(245,244,240,0.06)'}}
+      }
+    }
+  });
+}
+
+document.getElementById('modalClose').addEventListener('click', ()=>{
+  document.getElementById('modalBackdrop').classList.remove('open');
+});
+document.getElementById('modalBackdrop').addEventListener('click', (e)=>{
+  if(e.target.id === 'modalBackdrop') e.currentTarget.classList.remove('open');
+});
+document.getElementById('search').addEventListener('input', renderGrid);
+document.getElementById('sortBy').addEventListener('change', renderGrid);
+
+load();
+</script>
+</body>
+</html>
