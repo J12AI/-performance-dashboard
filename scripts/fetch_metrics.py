@@ -3,12 +3,12 @@
 J12 Performance Dashboard — Instagram metrics fetcher.
 
 Pulls media + insights for the configured Instagram Business account via the
-Meta Graph API, then writes:
+Instagram Graph API (Instagram Business Login), then writes:
   - data/videos.json   -> latest snapshot per video (what the dashboard reads)
   - data/history.jsonl  -> one line appended per video per run, for trend charts
 
 Required environment variables (set as GitHub Actions secrets):
-  IG_ACCESS_TOKEN   - long-lived user access token
+  IG_ACCESS_TOKEN   - long-lived Instagram user access token
   IG_BUSINESS_ID    - Instagram Business Account ID
 
 Run manually for testing:
@@ -24,7 +24,7 @@ from pathlib import Path
 import requests
 
 GRAPH_VERSION = "v21.0"
-GRAPH_BASE = f"https://graph.facebook.com/{GRAPH_VERSION}"
+GRAPH_BASE = f"https://graph.instagram.com/{GRAPH_VERSION}"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
@@ -44,6 +44,7 @@ def get_env(name):
 
 
 def fetch_media_list(access_token, ig_business_id):
+    """Fetch the list of media objects for the account."""
     media = []
     url = f"{GRAPH_BASE}/{ig_business_id}/media"
     params = {
@@ -63,6 +64,7 @@ def fetch_media_list(access_token, ig_business_id):
 
 
 def fetch_insights(access_token, media_id, media_type, media_product_type):
+    """Fetch insight metrics for a single media object."""
     metrics = list(BASE_METRICS)
     is_video_like = media_type in ("VIDEO",) or media_product_type in ("REELS", "VIDEO")
     if is_video_like:
@@ -85,14 +87,6 @@ def fetch_insights(access_token, media_id, media_type, media_product_type):
         if values:
             result[name] = values[0].get("value")
     return result
-
-
-def load_existing_videos():
-    if VIDEOS_JSON.exists():
-        with open(VIDEOS_JSON) as f:
-            existing = json.load(f)
-        return {v["id"]: v for v in existing}
-    return {}
 
 
 def main():
@@ -126,4 +120,47 @@ def main():
         record = {
             "id": media_id,
             "caption": (media.get("caption") or "")[:280],
-            "media_type":
+            "media_type": media.get("media_type"),
+            "media_product_type": media.get("media_product_type"),
+            "timestamp": media.get("timestamp"),
+            "permalink": media.get("permalink"),
+            "thumbnail_url": media.get("thumbnail_url") or media.get("media_url"),
+            "metrics": {
+                "views": views,
+                "reach": reach,
+                "likes": likes,
+                "comments": comments,
+                "shares": shares,
+                "saves": saves,
+                "avg_watch_time_sec": avg_watch_time,
+            },
+            "last_updated": run_timestamp,
+        }
+        videos.append(record)
+
+        history_lines.append(json.dumps({
+            "date": run_timestamp,
+            "id": media_id,
+            "views": views,
+            "reach": reach,
+            "likes": likes,
+            "comments": comments,
+            "shares": shares,
+            "saves": saves,
+            "avg_watch_time_sec": avg_watch_time,
+        }))
+
+    videos.sort(key=lambda v: v.get("timestamp") or "", reverse=True)
+
+    with open(VIDEOS_JSON, "w") as f:
+        json.dump(videos, f, indent=2)
+    print(f"Wrote {len(videos)} videos to {VIDEOS_JSON}")
+
+    with open(HISTORY_JSONL, "a") as f:
+        for line in history_lines:
+            f.write(line + "\n")
+    print(f"Appended {len(history_lines)} history rows to {HISTORY_JSONL}")
+
+
+if __name__ == "__main__":
+    main()
