@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J12 Performance Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111111'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='17' font-weight='700' fill='%235B8DEF' text-anchor='middle'%3EJ%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root{
@@ -11,107 +15,250 @@
     --panel:#1A1D24;
     --panel-2:#15171D;
     --border:rgba(245,244,240,0.09);
+    --border-strong:rgba(245,244,240,0.16);
     --text:#F5F4F0;
     --muted:rgba(245,244,240,0.58);
+    --faint:rgba(245,244,240,0.34);
     --accent:#5B8DEF;
     --accent-dim:rgba(91,141,239,0.15);
+    --up:#5BD6A0;
+    --down:#E8846B;
+    --mono:'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --serif:'Cormorant Garamond',Georgia,serif;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   }
   *{box-sizing:border-box;}
   body{
     background:var(--bg);
     color:var(--text);
-    font-family:'Inter',-apple-system,sans-serif;
+    font-family:var(--sans);
     margin:0;
-    padding:32px;
+    padding:36px 32px 64px;
+    -webkit-font-smoothing:antialiased;
   }
-  h1,h2,h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;margin:0;}
+  .wrap{max-width:1440px;margin:0 auto;}
+  h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0;letter-spacing:-0.01em;}
   .eyebrow{
-    font-family:'Space Mono',monospace;
-    font-size:11px;
-    letter-spacing:0.12em;
-    text-transform:uppercase;
-    color:var(--accent);
-    margin-bottom:6px;
+    font-family:var(--mono);font-size:11px;letter-spacing:0.14em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:8px;
   }
-  .header{margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-end;}
-  .header h1{font-size:32px;}
-  .header .updated{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;}
-  .subhead{color:var(--muted);font-size:13px;margin:8px 0 28px;}
+  .header{margin-bottom:6px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;}
+  .header h1{font-size:40px;line-height:1.05;}
+  .header-right{text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+  .updated{font-size:11px;color:var(--muted);font-family:var(--mono);}
+  .subhead{color:var(--muted);font-size:13px;margin:10px 0 0;}
 
-  .stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px;}
+  .notice{
+    display:none;margin:18px 0 0;padding:10px 14px;border-radius:8px;
+    background:rgba(232,132,107,0.09);border:1px solid rgba(232,132,107,0.28);
+    color:#E8A38F;font-size:12px;line-height:1.5;
+  }
+  .notice.show{display:block;}
+  .notice b{color:#F0BCAC;font-weight:600;}
+
+  /* ---------- stat row ---------- */
+  .stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:26px 0 24px;}
   .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
-  .stat-card .label{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
-  .stat-card .value{font-size:24px;font-weight:700;margin-top:6px;}
+  .stat-card .label{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+  .stat-card .value{font-size:26px;font-weight:700;margin-top:8px;letter-spacing:-0.02em;}
+  .stat-card .sub{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:5px;}
 
-  .toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+  /* ---------- section heading ---------- */
+  .section-head{display:flex;align-items:baseline;gap:12px;margin:34px 0 14px;}
+  .section-head h2{font-size:22px;}
+  .section-head .hint{font-size:11px;color:var(--faint);font-family:var(--mono);}
+
+  /* ---------- top performer ---------- */
+  .hero{
+    display:grid;grid-template-columns:132px 1fr;gap:22px;
+    background:linear-gradient(180deg,rgba(91,141,239,0.07),rgba(91,141,239,0.02));
+    border:1px solid rgba(91,141,239,0.25);border-radius:14px;padding:20px;cursor:pointer;
+    transition:border-color .15s;
+  }
+  .hero:hover{border-color:rgba(91,141,239,0.5);}
+  .hero-thumb{width:150px;aspect-ratio:1/1;object-fit:cover;border-radius:10px;background:var(--panel-2);display:block;}
+  .hero-body{min-width:0;display:flex;flex-direction:column;}
+  .hero-caption{font-size:15px;line-height:1.45;margin:2px 0 8px;font-weight:500;}
+  .hero-meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:14px;}
+  .hero-stats{display:flex;flex-wrap:wrap;gap:26px;margin-top:auto;}
+  .hero-stats .hs .l{font-family:var(--mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+  .hero-stats .hs .v{font-size:19px;font-weight:700;margin-top:3px;}
+  .hero-why{font-size:12px;color:var(--muted);line-height:1.55;margin-top:12px;}
+  .hero-why b{color:var(--up);font-weight:600;}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{display:flex;gap:10px;margin:14px 0 18px;align-items:center;flex-wrap:wrap;}
   select, input[type=text]{
     background:var(--panel-2);border:1px solid var(--border);color:var(--text);
-    border-radius:6px;padding:8px 12px;font-size:13px;font-family:'Inter',sans-serif;
+    border-radius:6px;padding:9px 12px;font-size:13px;font-family:var(--sans);
   }
+  input[type=text]{min-width:220px;}
+  input[type=text]::placeholder{color:var(--faint);}
+  select:focus,input:focus{outline:none;border-color:var(--accent);}
+  .spacer{flex:1;}
+  .seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .seg button{
+    background:var(--panel-2);border:none;color:var(--muted);padding:9px 15px;
+    font-family:var(--mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;
+  }
+  .seg button.active{background:var(--accent-dim);color:var(--accent);}
+  .count{font-family:var(--mono);font-size:11px;color:var(--faint);}
 
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;}
+  /* ---------- grid ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:16px;}
   .card{
     background:var(--panel);border:1px solid var(--border);border-radius:12px;
-    overflow:hidden;cursor:pointer;transition:border-color .15s;
+    overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s;
   }
-  .card:hover{border-color:var(--accent);}
-  .thumb{width:100%;aspect-ratio:9/16;background:var(--panel-2);object-fit:cover;display:block;}
-  .card-body{padding:12px 14px;}
-  .card-caption{font-size:12px;color:var(--text);line-height:1.4;max-height:34px;overflow:hidden;margin-bottom:8px;}
-  .card-date{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:8px;}
-  .metric-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;}
+  .card:hover{border-color:var(--accent);transform:translateY(-2px);}
+  .thumb-wrap{position:relative;background:var(--panel-2);}
+  .thumb{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;}
+  .badge{
+    position:absolute;top:8px;left:8px;font-family:var(--mono);font-size:9px;
+    letter-spacing:0.06em;text-transform:uppercase;padding:4px 7px;border-radius:5px;
+    background:rgba(17,17,17,0.82);backdrop-filter:blur(6px);border:1px solid var(--border-strong);
+  }
+  .badge.top{color:var(--up);border-color:rgba(91,214,160,0.4);}
+  .card-body{padding:12px 14px 13px;}
+  .card-caption{font-size:12.5px;line-height:1.42;height:36px;overflow:hidden;margin-bottom:9px;}
+  .card-caption.none{color:var(--faint);font-style:italic;}
+  .hero-caption .none,.modal h2 .none{color:var(--muted);font-style:normal;}
+  .card-date{font-size:10px;color:var(--faint);font-family:var(--mono);margin-bottom:10px;}
+  .metric-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-family:var(--mono);}
   .metric-row .primary{color:var(--accent);font-weight:700;}
+  .perfbar{height:3px;border-radius:2px;background:rgba(245,244,240,0.07);margin-top:10px;overflow:hidden;}
+  .perfbar i{display:block;height:100%;border-radius:2px;background:var(--accent);}
+  .perfbar i.over{background:var(--up);}
 
-  .empty-state, .loading{color:var(--muted);text-align:center;padding:60px 0;font-size:13px;}
+  /* ---------- table ---------- */
+  .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--panel);}
+  table{border-collapse:collapse;width:100%;min-width:860px;}
+  th{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:0.09em;text-transform:uppercase;
+    color:var(--muted);text-align:right;padding:12px 14px;border-bottom:1px solid var(--border);
+    cursor:pointer;white-space:nowrap;user-select:none;
+  }
+  th:first-child{text-align:left;}
+  th:hover{color:var(--text);}
+  th.sorted{color:var(--accent);}
+  td{padding:11px 14px;font-size:12.5px;text-align:right;border-bottom:1px solid rgba(245,244,240,0.05);font-family:var(--mono);color:var(--muted);white-space:nowrap;}
+  td:first-child{text-align:left;font-family:var(--sans);color:var(--text);white-space:normal;min-width:280px;}
+  tbody tr{cursor:pointer;}
+  tbody tr:hover{background:rgba(245,244,240,0.03);}
+  td .tcap{display:block;line-height:1.4;}
+  td .tdate{display:block;font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:3px;}
+  td.num-strong{color:var(--text);font-weight:700;}
+  .delta{font-weight:700;}
+  .delta.up{color:var(--up);}
+  .delta.down{color:var(--down);}
 
-  /* Modal */
+  .empty-state,.loading{color:var(--muted);text-align:center;padding:60px 0;font-size:13px;}
+
+  /* ---------- modal ---------- */
   .modal-backdrop{
-    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.74);backdrop-filter:blur(3px);
     align-items:center;justify-content:center;z-index:50;padding:20px;
   }
   .modal-backdrop.open{display:flex;}
   .modal{
-    background:var(--panel);border:1px solid var(--border);border-radius:14px;
-    max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;
+    background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;
+    max-width:680px;width:100%;max-height:88vh;overflow-y:auto;padding:26px;
   }
-  .modal-close{float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
-  .modal h2{font-size:20px;margin-bottom:4px;}
-  .modal .meta{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:18px;}
-  .modal-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
-  .modal-stats .mstat{background:var(--panel-2);border-radius:8px;padding:10px 12px;}
-  .modal-stats .mstat .l{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;text-transform:uppercase;}
-  .modal-stats .mstat .v{font-size:18px;font-weight:700;margin-top:3px;}
+  .modal-close{float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;}
+  .modal-close:hover{color:var(--text);}
+  .modal h2{font-size:21px;margin-bottom:6px;line-height:1.3;}
+  .modal .meta{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:18px;}
+  .modal-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+  .mstat{background:var(--panel-2);border-radius:8px;padding:11px 12px;}
+  .mstat .l{font-size:9px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.07em;}
+  .mstat .v{font-size:18px;font-weight:700;margin-top:4px;}
+  .mstat .d{font-family:var(--mono);font-size:9.5px;margin-top:3px;}
+  .chart-head{display:flex;justify-content:space-between;align-items:baseline;margin:20px 0 8px;}
+  .chart-head .t{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+  .chart-head .n{font-family:var(--mono);font-size:10px;color:var(--faint);}
   .modal a.permalink{color:var(--accent);font-size:12px;text-decoration:none;}
+  .modal a.permalink:hover{text-decoration:underline;}
+
+  @media (max-width:1180px){ .stat-grid{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:760px){
+    body{padding:24px 18px 48px;}
+    .header h1{font-size:30px;}
+    .header-right{text-align:left;align-items:flex-start;}
+    .stat-grid{grid-template-columns:repeat(2,1fr);}
+    .hero{grid-template-columns:1fr;}
+    .hero-thumb{width:100%;max-width:180px;}
+    .modal-stats{grid-template-columns:repeat(2,1fr);}
+    input[type=text]{min-width:0;flex:1;}
+  }
 </style>
 </head>
 <body>
+<div class="wrap">
 
 <div class="header">
   <div>
     <div class="eyebrow">J12 · Content OS</div>
     <h1>Performance Dashboard</h1>
   </div>
-  <div class="updated" id="lastUpdated">—</div>
+  <div class="header-right">
+    <div class="updated" id="lastUpdated">—</div>
+    <div class="updated" id="trackedDays"></div>
+  </div>
 </div>
-<div class="subhead">Live from Instagram Graph API · updated automatically once a day</div>
+<div class="subhead">Live from the Instagram Graph API · refreshed automatically once a day</div>
+<div class="notice" id="notice"></div>
 
 <div id="loading" class="loading">Loading data…</div>
 <div id="app" style="display:none;">
 
   <div class="stat-grid" id="statGrid"></div>
 
+  <div class="section-head">
+    <h2>Top performer</h2>
+    <span class="hint" id="heroHint"></span>
+  </div>
+  <div id="heroSlot"></div>
+
+  <div class="section-head">
+    <h2>All posts</h2>
+    <span class="hint">click any post for its full breakdown</span>
+  </div>
+
   <div class="toolbar">
     <input type="text" id="search" placeholder="Search captions…">
     <select id="sortBy">
       <option value="views">Sort: Views</option>
+      <option value="engRate">Sort: Engagement rate</option>
+      <option value="saveRate">Sort: Save rate</option>
       <option value="saves">Sort: Saves</option>
+      <option value="shares">Sort: Shares</option>
       <option value="likes">Sort: Likes</option>
       <option value="timestamp">Sort: Newest</option>
     </select>
+    <select id="range">
+      <option value="all">All time</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last 12 months</option>
+    </select>
+    <span class="spacer"></span>
+    <span class="count" id="count"></span>
+    <div class="seg">
+      <button id="viewGrid" class="active">Grid</button>
+      <button id="viewTable">Table</button>
+    </div>
   </div>
 
   <div class="grid" id="videoGrid"></div>
-  <div id="emptyState" class="empty-state" style="display:none;">No data yet — waiting on the first automated fetch.</div>
+  <div class="table-scroll" id="tableWrap" style="display:none;">
+    <table>
+      <thead><tr id="tableHead"></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <div id="emptyState" class="empty-state" style="display:none;">Nothing matches that filter.</div>
+</div>
+
 </div>
 
 <div class="modal-backdrop" id="modalBackdrop">
@@ -122,157 +269,429 @@
 </div>
 
 <script>
-let videos = [];
-let history = [];
+let videos = [], history = [], stats = {}, viewMode = 'grid';
+let tableSort = {key:'views', dir:-1};
 
+/* ---------- formatting ---------- */
 function fmt(n){
   n = Number(n) || 0;
   if(n >= 1000000) return (n/1000000).toFixed(1)+'M';
   if(n >= 1000) return (n/1000).toFixed(1)+'K';
-  return n;
+  return String(n);
 }
-
+function pct(x){ return (x*100).toFixed(1)+'%'; }
 function escapeHtml(str){
-  const div = document.createElement('div');
-  div.textContent = str || '';
-  return div.innerHTML;
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+function median(arr){
+  if(!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b), m = Math.floor(s.length/2);
+  return s.length % 2 ? s[m] : (s[m-1]+s[m])/2;
+}
+function ratioLabel(value, base){
+  if(!base) return null;
+  const r = value / base;
+  const pctDiff = Math.round((r - 1) * 100);
+  return {r, pctDiff, up: pctDiff >= 0, text: (pctDiff >= 0 ? '+' : '') + pctDiff + '%'};
 }
 
+/* ---------- derive ---------- */
+// Reach is the honest denominator for a rate: it's unique people, so a rate
+// built on it can't exceed 100% the way a views-based one can.
+function derive(){
+  videos.forEach(v => {
+    const m = v.metrics || {};
+    const reach = Number(m.reach) || 0;
+    const engagement = Number(m.interactions) ||
+      (Number(m.likes||0) + Number(m.comments||0) + Number(m.shares||0) + Number(m.saves||0));
+    v.d = {
+      views: Number(m.views)||0,
+      reach, engagement,
+      likes: Number(m.likes)||0,
+      comments: Number(m.comments)||0,
+      shares: Number(m.shares)||0,
+      saves: Number(m.saves)||0,
+      engRate: reach ? engagement/reach : 0,
+      saveRate: reach ? (Number(m.saves)||0)/reach : 0,
+      shareRate: reach ? (Number(m.shares)||0)/reach : 0,
+      watch: m.avg_watch_time_sec,
+    };
+  });
+
+  const viewsArr = videos.map(v=>v.d.views);
+  stats.medianViews = median(viewsArr);
+  stats.medianEng = median(videos.map(v=>v.d.engRate));
+  stats.medianSave = median(videos.map(v=>v.d.saveRate));
+  stats.totalViews = viewsArr.reduce((a,b)=>a+b,0);
+  stats.totalReach = videos.reduce((a,v)=>a+v.d.reach,0);
+  stats.totalEng = videos.reduce((a,v)=>a+v.d.engagement,0);
+  stats.avgEngRate = stats.totalReach ? stats.totalEng/stats.totalReach : 0;
+  stats.avgSaveRate = stats.totalReach ? videos.reduce((a,v)=>a+v.d.saves,0)/stats.totalReach : 0;
+
+  const watches = videos.map(v=>v.d.watch).filter(w => w != null);
+  stats.avgWatch = watches.length ? watches.reduce((a,b)=>a+b,0)/watches.length : null;
+
+  // The fetcher flags this when the API withheld `views` and reach stood in.
+  // Posts with no reach at all carry no signal either way, so they're
+  // excluded rather than allowed to veto the check.
+  const measurable = videos.filter(v => v.d.reach > 0);
+  stats.viewsAreReach = measurable.length > 0 && measurable.every(v =>
+    v.metrics.views_are_reach === true ||
+    (v.metrics.views_are_reach === undefined && v.d.views === v.d.reach)
+  );
+
+  stats.top = videos.slice().sort((a,b)=>b.d.views-a.d.views)[0] || null;
+
+  const days = new Set(history.map(h => (h.date||'').slice(0,10)).filter(Boolean));
+  stats.trackedDays = days.size;
+}
+
+/* ---------- load ---------- */
 async function load(){
   try{
-    const vRes = await fetch('data/videos.json?_=' + Date.now());
-    videos = vRes.ok ? await vRes.json() : [];
+    const r = await fetch('data/videos.json?_='+Date.now());
+    videos = r.ok ? await r.json() : [];
   }catch(e){ videos = []; }
 
   try{
-    const hRes = await fetch('data/history.jsonl?_=' + Date.now());
-    if(hRes.ok){
-      const text = await hRes.text();
-      history = text.trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
+    const r = await fetch('data/history.jsonl?_='+Date.now());
+    if(r.ok){
+      history = (await r.text()).trim().split('\n').filter(Boolean).map(l=>{
+        try{ return JSON.parse(l); }catch(e){ return null; }
+      }).filter(Boolean);
     }
   }catch(e){ history = []; }
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
-  if(videos.length){
-    const latest = videos.reduce((a,v)=> (v.last_updated > a ? v.last_updated : a), videos[0].last_updated || '');
-    document.getElementById('lastUpdated').textContent = 'Last updated: ' + (latest ? new Date(latest).toLocaleString() : '—');
+  if(!videos.length){
+    document.getElementById('emptyState').textContent = 'No data yet — waiting on the first automated fetch.';
+    document.getElementById('emptyState').style.display = 'block';
+    return;
+  }
+
+  derive();
+
+  const latest = videos.reduce((a,v)=> (v.last_updated > a ? v.last_updated : a), videos[0].last_updated || '');
+  document.getElementById('lastUpdated').textContent =
+    'Last updated: ' + (latest ? new Date(latest).toLocaleString() : '—');
+  document.getElementById('trackedDays').textContent =
+    stats.trackedDays + (stats.trackedDays === 1 ? ' day of history' : ' days of history');
+
+  if(stats.viewsAreReach){
+    const n = document.getElementById('notice');
+    n.className = 'notice show';
+    n.innerHTML = '<b>Heads up:</b> the API returned no view count for these posts, so <b>reach</b> is shown in place of views. ' +
+                  'Real view counts are higher. This clears itself on the next fetch once the corrected metric names go live.';
+  }
+
+  if(stats.viewsAreReach){
+    const opt = document.querySelector('#sortBy option[value="views"]');
+    if(opt) opt.textContent = 'Sort: Reach';
   }
 
   renderStats();
-  renderGrid();
+  renderHero();
+  render();
 }
 
+/* ---------- stats ---------- */
 function renderStats(){
-  const totalViews = videos.reduce((a,v)=>a+Number(v.metrics.views||0),0);
-  const totalLikes = videos.reduce((a,v)=>a+Number(v.metrics.likes||0),0);
-  const totalSaves = videos.reduce((a,v)=>a+Number(v.metrics.saves||0),0);
-  const totalComments = videos.reduce((a,v)=>a+Number(v.metrics.comments||0),0);
-
-  document.getElementById('statGrid').innerHTML = `
-    <div class="stat-card"><div class="label">Videos</div><div class="value">${videos.length}</div></div>
-    <div class="stat-card"><div class="label">Total Views</div><div class="value">${fmt(totalViews)}</div></div>
-    <div class="stat-card"><div class="label">Total Likes</div><div class="value">${fmt(totalLikes)}</div></div>
-    <div class="stat-card"><div class="label">Total Saves</div><div class="value">${fmt(totalSaves)}</div></div>
-    <div class="stat-card"><div class="label">Total Comments</div><div class="value">${fmt(totalComments)}</div></div>
-  `;
+  const viewLabel = stats.viewsAreReach ? 'Total Reach' : 'Total Views';
+  const medLabel  = stats.viewsAreReach ? 'Median Reach' : 'Median Views';
+  const cards = [
+    ['Posts', videos.length, 'tracked'],
+    [viewLabel, fmt(stats.totalViews), stats.viewsAreReach ? 'views unavailable' : 'all time'],
+    [medLabel, fmt(stats.medianViews), 'the typical post'],
+    ['Engagement Rate', pct(stats.avgEngRate), 'of people reached'],
+    ['Save Rate', pct(stats.avgSaveRate), 'saves ÷ reach'],
+    ['Avg Watch Time', stats.avgWatch != null ? stats.avgWatch.toFixed(1)+'s' : '—',
+      stats.avgWatch != null ? 'per reel' : 'not yet reported'],
+  ];
+  document.getElementById('statGrid').innerHTML = cards.map(([l,v,s]) => `
+    <div class="stat-card">
+      <div class="label">${l}</div>
+      <div class="value">${v}</div>
+      <div class="sub">${s}</div>
+    </div>`).join('');
 }
 
-function renderGrid(){
-  const searchVal = document.getElementById('search').value.toLowerCase();
-  const sortBy = document.getElementById('sortBy').value;
+/* ---------- top performer ---------- */
+function renderHero(){
+  const v = stats.top;
+  if(!v){ document.getElementById('heroSlot').innerHTML = ''; return; }
+  const d = v.d;
+  const vsViews = ratioLabel(d.views, stats.medianViews);
+  const vsSave  = ratioLabel(d.saveRate, stats.medianSave);
 
-  let filtered = videos.filter(v => (v.caption||'').toLowerCase().includes(searchVal));
-  filtered.sort((a,b)=>{
+  const reasons = [];
+  if(vsViews && vsViews.r >= 1.15) reasons.push(`<b>${vsViews.r.toFixed(1)}×</b> the reach of your median post`);
+  if(vsSave && vsSave.r >= 1.15) reasons.push(`<b>${vsSave.r.toFixed(1)}×</b> your median save rate`);
+  if(d.engRate > stats.medianEng) reasons.push(`an engagement rate of <b>${pct(d.engRate)}</b>`);
+
+  document.getElementById('heroHint').textContent =
+    stats.viewsAreReach ? 'ranked by reach' : 'ranked by views';
+
+  document.getElementById('heroSlot').innerHTML = `
+    <div class="hero" data-id="${v.id}">
+      <img class="hero-thumb" src="${v.thumbnail_url||''}" loading="lazy" onerror="this.style.opacity=0">
+      <div class="hero-body">
+        <div class="hero-caption">${captionText(v, 150, true)}</div>
+        <div class="hero-meta">${v.timestamp ? new Date(v.timestamp).toLocaleDateString() : ''} · ${v.media_product_type || v.media_type || ''}</div>
+        <div class="hero-stats">
+          <div class="hs"><div class="l">${stats.viewsAreReach?'Reach':'Views'}</div><div class="v">${fmt(d.views)}</div></div>
+          <div class="hs"><div class="l">Engagement</div><div class="v">${pct(d.engRate)}</div></div>
+          <div class="hs"><div class="l">Saves</div><div class="v">${fmt(d.saves)}</div></div>
+          <div class="hs"><div class="l">Shares</div><div class="v">${fmt(d.shares)}</div></div>
+          ${d.watch != null ? `<div class="hs"><div class="l">Avg Watch</div><div class="v">${d.watch}s</div></div>` : ''}
+        </div>
+        ${reasons.length ? `<div class="hero-why">Why it stands out: ${reasons.join(' · ')}.</div>` : ''}
+      </div>
+    </div>`;
+}
+
+function captionText(v, len, fallback){
+  const c = (v.caption||'').trim();
+  if(!c){
+    if(fallback){
+      const kind = (v.media_product_type === 'REELS' ? 'Reel' : 'Post');
+      const when = v.timestamp
+        ? new Date(v.timestamp).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'})
+        : '';
+      return `<span class="none">${kind}${when ? ' from ' + when : ''}</span>`;
+    }
+    return `<span class="none">No caption</span>`;
+  }
+  return escapeHtml(c.length > len ? c.slice(0,len)+'…' : c);
+}
+
+/* ---------- filtering ---------- */
+function currentSet(){
+  const q = document.getElementById('search').value.toLowerCase();
+  const range = document.getElementById('range').value;
+  let out = videos.filter(v => (v.caption||'').toLowerCase().includes(q));
+  if(range !== 'all'){
+    const cutoff = Date.now() - Number(range)*86400000;
+    out = out.filter(v => v.timestamp && new Date(v.timestamp).getTime() >= cutoff);
+  }
+  return out;
+}
+
+function render(){
+  const set = currentSet();
+  document.getElementById('count').textContent =
+    set.length + (set.length === 1 ? ' post' : ' posts');
+  document.getElementById('emptyState').style.display = set.length ? 'none' : 'block';
+  document.getElementById('videoGrid').style.display = (viewMode==='grid' && set.length) ? '' : 'none';
+  document.getElementById('tableWrap').style.display = (viewMode==='table' && set.length) ? '' : 'none';
+  if(!set.length) return;
+  viewMode === 'grid' ? renderGrid(set) : renderTable(set);
+}
+
+/* ---------- grid ---------- */
+function renderGrid(set){
+  const sortBy = document.getElementById('sortBy').value;
+  const sorted = set.slice().sort((a,b)=>{
     if(sortBy === 'timestamp') return (b.timestamp||'').localeCompare(a.timestamp||'');
-    return Number(b.metrics[sortBy]||0) - Number(a.metrics[sortBy]||0);
+    return b.d[sortBy] - a.d[sortBy];
   });
 
-  const gridEl = document.getElementById('videoGrid');
-  const emptyEl = document.getElementById('emptyState');
-
-  if(filtered.length === 0){
-    gridEl.innerHTML = '';
-    emptyEl.style.display = 'block';
-    return;
-  }
-  emptyEl.style.display = 'none';
-
-  gridEl.innerHTML = filtered.map(v => `
-    <div class="card" onclick="openModal('${v.id}')">
-      <img class="thumb" src="${v.thumbnail_url || ''}" loading="lazy" onerror="this.style.opacity=0">
+  document.getElementById('videoGrid').innerHTML = sorted.map(v => {
+    const d = v.d;
+    const ratio = stats.medianViews ? d.views/stats.medianViews : 0;
+    const width = Math.min(100, ratio*33.3); // median sits a third along; 3x fills it
+    const isTop = stats.top && v.id === stats.top.id;
+    const unit = stats.viewsAreReach ? 'reach' : 'views';
+    const tip = stats.medianViews
+      ? `${ratio.toFixed(1)}× the median post's ${unit}`
+      : '';
+    return `
+    <div class="card" data-id="${v.id}" title="${tip}">
+      <div class="thumb-wrap">
+        <img class="thumb" src="${v.thumbnail_url||''}" loading="lazy" onerror="this.style.opacity=0">
+        ${isTop ? '<span class="badge top">Top</span>' : ''}
+      </div>
       <div class="card-body">
-        <div class="card-caption">${escapeHtml((v.caption||'Untitled').slice(0,60))}</div>
+        <div class="card-caption">${captionText(v, 64)}</div>
         <div class="card-date">${v.timestamp ? new Date(v.timestamp).toLocaleDateString() : ''}</div>
         <div class="metric-row">
-          <span class="primary">${fmt(v.metrics.views)} views</span>
-          <span>${fmt(v.metrics.saves)} saves</span>
+          <span class="primary">${fmt(d.views)} ${stats.viewsAreReach?'reach':'views'}</span>
+          <span>${pct(d.engRate)} eng</span>
         </div>
+        <div class="perfbar"><i class="${ratio>=1?'over':''}" style="width:${width}%"></i></div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-let trendChartInstance;
+/* ---------- table ---------- */
+const COLS = [
+  {key:'caption',  label:'Post',        sortable:true},
+  {key:'views',    label:'Views',       sortable:true},
+  {key:'reach',    label:'Reach',       sortable:true},
+  {key:'engRate',  label:'Eng %',       sortable:true},
+  {key:'saveRate', label:'Save %',      sortable:true},
+  {key:'saves',    label:'Saves',       sortable:true},
+  {key:'shares',   label:'Shares',      sortable:true},
+  {key:'vsMedian', label:'vs Median',   sortable:true},
+];
 
-window.openModal = function(id){
+function visibleCols(){
+  return stats.viewsAreReach ? COLS.filter(c => c.key !== 'reach') : COLS;
+}
+
+function renderTable(set){
+  const cols = visibleCols();
+  document.getElementById('tableHead').innerHTML = cols.map(c => {
+    const label = c.key === 'views' && stats.viewsAreReach ? 'Reach' : c.label;
+    const arrow = tableSort.key === c.key ? (tableSort.dir === -1 ? ' ↓' : ' ↑') : '';
+    return `<th data-key="${c.key}" class="${tableSort.key===c.key?'sorted':''}">${label}${arrow}</th>`;
+  }).join('');
+
+  const sorted = set.slice().sort((a,b)=>{
+    const k = tableSort.key;
+    let av, bv;
+    if(k === 'caption'){ av = (a.caption||'').toLowerCase(); bv = (b.caption||'').toLowerCase(); return av < bv ? tableSort.dir : av > bv ? -tableSort.dir : 0; }
+    if(k === 'vsMedian'){ av = a.d.views; bv = b.d.views; }
+    else { av = a.d[k]; bv = b.d[k]; }
+    return (bv - av) * (tableSort.dir === -1 ? 1 : -1);
+  });
+
+  document.getElementById('tableBody').innerHTML = sorted.map(v => {
+    const d = v.d;
+    const vs = ratioLabel(d.views, stats.medianViews);
+    return `
+    <tr data-id="${v.id}">
+      <td>
+        <span class="tcap">${captionText(v, 78)}</span>
+        <span class="tdate">${v.timestamp ? new Date(v.timestamp).toLocaleDateString() : ''}</span>
+      </td>
+      <td class="num-strong">${fmt(d.views)}</td>
+      ${stats.viewsAreReach ? '' : `<td>${fmt(d.reach)}</td>`}
+      <td>${pct(d.engRate)}</td>
+      <td>${pct(d.saveRate)}</td>
+      <td>${fmt(d.saves)}</td>
+      <td>${fmt(d.shares)}</td>
+      <td class="delta ${vs && vs.up ? 'up':'down'}">${vs ? vs.text : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---------- modal ---------- */
+let trendChart;
+
+function openModal(id){
   const v = videos.find(x => x.id === id);
   if(!v) return;
+  const d = v.d;
+  const vs = ratioLabel(d.views, stats.medianViews);
+  const vsEng = ratioLabel(d.engRate, stats.medianEng);
+  const vsSave = ratioLabel(d.saveRate, stats.medianSave);
 
-  const m = v.metrics;
+  const tile = (l, val, delta) => `
+    <div class="mstat">
+      <div class="l">${l}</div>
+      <div class="v">${val}</div>
+      ${delta ? `<div class="d delta ${delta.up?'up':'down'}">${delta.text} vs median</div>` : ''}
+    </div>`;
+
   document.getElementById('modalContent').innerHTML = `
-    <h2>${escapeHtml((v.caption||'Untitled').slice(0,90))}</h2>
+    <h2>${captionText(v, 120, true)}</h2>
     <div class="meta">${v.timestamp ? new Date(v.timestamp).toLocaleString() : ''} · ${v.media_product_type || v.media_type || ''}</div>
     <div class="modal-stats">
-      <div class="mstat"><div class="l">Views</div><div class="v">${fmt(m.views)}</div></div>
-      <div class="mstat"><div class="l">Reach</div><div class="v">${fmt(m.reach)}</div></div>
-      <div class="mstat"><div class="l">Likes</div><div class="v">${fmt(m.likes)}</div></div>
-      <div class="mstat"><div class="l">Comments</div><div class="v">${fmt(m.comments)}</div></div>
-      <div class="mstat"><div class="l">Shares</div><div class="v">${fmt(m.shares)}</div></div>
-      <div class="mstat"><div class="l">Saves</div><div class="v">${fmt(m.saves)}</div></div>
-      ${m.avg_watch_time_sec != null ? `<div class="mstat"><div class="l">Avg Watch Time</div><div class="v">${m.avg_watch_time_sec}s</div></div>` : ''}
+      ${tile(stats.viewsAreReach?'Reach':'Views', fmt(d.views), vs)}
+      ${stats.viewsAreReach ? '' : tile('Reach', fmt(d.reach), null)}
+      ${tile('Eng Rate', pct(d.engRate), vsEng)}
+      ${tile('Save Rate', pct(d.saveRate), vsSave)}
+      ${tile('Likes', fmt(d.likes), null)}
+      ${tile('Comments', fmt(d.comments), null)}
+      ${tile('Shares', fmt(d.shares), null)}
+      ${tile('Saves', fmt(d.saves), null)}
+      ${d.watch != null ? tile('Avg Watch', d.watch+'s', null) : ''}
     </div>
-    <canvas id="trendCanvas" height="120"></canvas>
-    <div style="margin-top:16px;">
-      ${v.permalink ? `<a class="permalink" href="${v.permalink}" target="_blank">View on Instagram →</a>` : ''}
+    <div class="chart-head">
+      <span class="t">${stats.viewsAreReach?'Reach':'Views'} over time</span>
+      <span class="n" id="chartNote"></span>
     </div>
+    <canvas id="trendCanvas" height="130"></canvas>
+    ${v.permalink ? `<div style="margin-top:18px;"><a class="permalink" href="${v.permalink}" target="_blank" rel="noopener">View on Instagram →</a></div>` : ''}
   `;
   document.getElementById('modalBackdrop').classList.add('open');
 
-  const rows = history.filter(h => h.id === id).sort((a,b)=> a.date.localeCompare(b.date));
+  const rows = history.filter(h => h.id === id)
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+
+  document.getElementById('chartNote').textContent = rows.length <= 1
+    ? 'needs a few more daily runs to form a trend'
+    : rows.length + ' days tracked';
+
   const ctx = document.getElementById('trendCanvas');
-  if(trendChartInstance) trendChartInstance.destroy();
-  trendChartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: rows.length ? rows.map(r => new Date(r.date).toLocaleDateString()) : ['No history yet'],
-      datasets: [{
-        label: 'Views over time',
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: rows.length ? rows.map(r => new Date(r.date).toLocaleDateString()) : ['—'],
+      datasets:[{
         data: rows.length ? rows.map(r => r.views) : [0],
-        borderColor: '#5B8DEF',
-        backgroundColor: 'rgba(91,141,239,0.12)',
-        fill: true, tension: 0.3, pointRadius: 3,
+        borderColor:'#5B8DEF',
+        backgroundColor:'rgba(91,141,239,0.12)',
+        fill:true, tension:0.3, pointRadius: rows.length <= 1 ? 5 : 3, borderWidth:2,
       }]
     },
-    options: {
+    options:{
+      responsive:true,
       plugins:{legend:{display:false}},
       scales:{
-        x:{ticks:{color:'rgba(245,244,240,0.58)',font:{size:10}},grid:{color:'rgba(245,244,240,0.06)'}},
-        y:{ticks:{color:'rgba(245,244,240,0.58)',font:{size:10}},grid:{color:'rgba(245,244,240,0.06)'}}
+        x:{ticks:{color:'rgba(245,244,240,0.4)',font:{size:9,family:'Space Mono'}},grid:{color:'rgba(245,244,240,0.05)'}},
+        y:{
+          beginAtZero:true,
+          ticks:{color:'rgba(245,244,240,0.4)',font:{size:9,family:'Space Mono'},
+                 maxTicksLimit:5, callback:v=>fmt(v)},
+          grid:{color:'rgba(245,244,240,0.05)'}
+        }
       }
     }
   });
 }
 
-document.getElementById('modalClose').addEventListener('click', ()=>{
-  document.getElementById('modalBackdrop').classList.remove('open');
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const row = e.target.closest('[data-id]');
+  if(row) openModal(row.dataset.id);
+
+  const th = e.target.closest('th[data-key]');
+  if(th){
+    const k = th.dataset.key;
+    tableSort = (tableSort.key === k) ? {key:k, dir:-tableSort.dir} : {key:k, dir:-1};
+    render();
+  }
 });
-document.getElementById('modalBackdrop').addEventListener('click', (e)=>{
+document.getElementById('modalClose').addEventListener('click', ()=>
+  document.getElementById('modalBackdrop').classList.remove('open'));
+document.getElementById('modalBackdrop').addEventListener('click', e=>{
   if(e.target.id === 'modalBackdrop') e.currentTarget.classList.remove('open');
 });
-document.getElementById('search').addEventListener('input', renderGrid);
-document.getElementById('sortBy').addEventListener('change', renderGrid);
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape') document.getElementById('modalBackdrop').classList.remove('open');
+});
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('sortBy').addEventListener('change', render);
+document.getElementById('range').addEventListener('change', render);
+document.getElementById('viewGrid').addEventListener('click', ()=>{
+  viewMode='grid';
+  document.getElementById('viewGrid').classList.add('active');
+  document.getElementById('viewTable').classList.remove('active');
+  render();
+});
+document.getElementById('viewTable').addEventListener('click', ()=>{
+  viewMode='table';
+  document.getElementById('viewTable').classList.add('active');
+  document.getElementById('viewGrid').classList.remove('active');
+  render();
+});
 
 load();
 </script>
