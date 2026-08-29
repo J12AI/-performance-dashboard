@@ -194,7 +194,9 @@
   .embed-toggle:hover{border-color:var(--accent);color:var(--accent);}
   .embed-wrap{display:none;margin-bottom:18px;border-radius:10px;overflow:hidden;background:#000;}
   .embed-wrap.open{display:block;}
-  .embed-wrap iframe{width:100%;height:640px;border:0;display:block;}
+  .embed-wrap video{width:100%;max-height:62vh;display:block;background:#000;}
+  .embed-fallback{padding:28px 20px;text-align:center;font-size:12px;color:var(--muted);line-height:1.7;}
+  .embed-fallback a{color:var(--accent);text-decoration:none;}
   .caveat{
     font-size:11px;color:var(--faint);line-height:1.5;margin-top:10px;
     padding-left:10px;border-left:2px solid var(--border);
@@ -352,7 +354,7 @@
 
   <div class="panel">
     <div class="panel-head">
-      <span class="t" id="cRankTitle">Every post, ranked</span>
+      <span class="t" id="cRankTitle">Performance across your posting timeline</span>
       <span class="n" id="cRankNote"></span>
     </div>
     <div class="chart-box"><canvas id="rankChart"></canvas></div>
@@ -792,7 +794,7 @@ function openModal(id){
       ${tile('Saves', fmt(d.saves), null)}
       ${d.watch != null ? tile('Avg Watch', d.watch+'s', null) : ''}
     </div>
-    ${code ? `<button class="embed-toggle" id="embedBtn">▶ Play the reel</button>
+    ${v.media_url ? `<button class="embed-toggle" id="embedBtn">▶ Play the reel</button>
     <div class="embed-wrap" id="embedWrap"></div>` : ''}
     <div class="chart-head">
       <span class="t">${stats.viewsAreReach?'Reach':'Views'} over time</span>
@@ -805,11 +807,6 @@ function openModal(id){
       <span class="n" id="watchNote"></span>
     </div>
     <div style="height:170px;"><canvas id="watchCanvas"></canvas></div>` : ''}
-    <div class="caveat">
-      Instagram's API reports totals only — it has no frame-by-frame retention curve,
-      so a drop-off graph synced to playback isn't something any tool can build on this data.
-      Avg watch time is the closest signal it exposes.
-    </div>
     ${v.permalink ? `<div style="margin-top:18px;"><a class="permalink" href="${v.permalink}" target="_blank" rel="noopener">View on Instagram →</a></div>` : ''}
   `;
   document.getElementById('modalBackdrop').classList.add('open');
@@ -847,8 +844,10 @@ function openModal(id){
         wrap.innerHTML = '';
         btn.textContent = '▶ Play the reel';
       } else {
-        wrap.innerHTML = `<iframe src="https://www.instagram.com/reel/${code}/embed/"
-          allowtransparency="true" allowfullscreen scrolling="no"></iframe>`;
+        // Signed CDN URLs expire between daily runs; fall back to Instagram
+        // rather than leaving a dead black box.
+        wrap.innerHTML = `<video src="${v.media_url}" controls autoplay playsinline
+          onerror="this.closest('.embed-wrap').innerHTML='<div class=\\'embed-fallback\\'>This video link has expired — the next daily fetch will refresh it.<br><a href=\\'${v.permalink}\\' target=\\'_blank\\' rel=\\'noopener\\'>Watch on Instagram →</a></div>'"></video>`;
         wrap.classList.add('open');
         btn.textContent = '✕ Hide the reel';
       }
@@ -891,33 +890,75 @@ function renderCompare(){
   const limit = Number(document.getElementById('cLimit').value);
   const top = sorted.slice(0, limit);
 
-  document.getElementById('cRankTitle').textContent = 'Every post, ranked by ' + def.label.toLowerCase();
+  document.getElementById('cRankTitle').textContent =
+    def.label + ' across your posting timeline';
   document.getElementById('cRankNote').textContent =
-    top.length + ' of ' + sorted.length + ' shown';
+    top.length + ' of ' + sorted.length + ' posts · oldest to newest · click a point to open it';
 
-  // --- ranked bar ---
+  // --- performance across the posting timeline ---
+  // Ordered by post date, not by rank, so the shape shows whether the account
+  // is trending up over months rather than just which post won.
+  const chrono = top.slice().sort((a,b) => (a.timestamp||'').localeCompare(b.timestamp||''));
+  const points = chrono.map(v => ({
+    x: v.timestamp ? new Date(v.timestamp).toLocaleDateString() : '',
+    y: def.get(v.d), id: v.id, label: shortLabel(v)
+  }));
+
+  // Rolling mean over 5 posts — enough to show direction without flattening
+  // the spikes that matter.
+  const WINDOW = 5;
+  const rolling = points.map((_, i) => {
+    const from = Math.max(0, i - WINDOW + 1);
+    const slice = points.slice(from, i + 1).map(p => p.y);
+    return slice.reduce((a,b)=>a+b, 0) / slice.length;
+  });
+
   if(charts.rankChart) charts.rankChart.destroy();
   charts.rankChart = new Chart(document.getElementById('rankChart'), {
-    type:'bar',
+    type:'line',
     data:{
-      labels: top.map(shortLabel),
-      datasets:[{
-        data: top.map(v => def.get(v.d)),
-        backgroundColor: top.map(v => v.id === (stats.top&&stats.top.id) ? 'rgb(91,214,160)' : def.color),
-        borderRadius:3, barThickness: top.length > 25 ? 8 : 14,
-      }]
+      labels: points.map(p => p.x),
+      datasets:[
+        {
+          label: def.label,
+          data: points.map(p => p.y),
+          borderColor: def.color,
+          backgroundColor: def.color.replace('rgb','rgba').replace(')',',0.10)'),
+          fill:true, tension:0.25, borderWidth:2,
+          pointRadius:4, pointHoverRadius:7,
+          pointBackgroundColor: chrono.map(v =>
+            v.id === (stats.top && stats.top.id) ? 'rgb(91,214,160)' : def.color),
+        },
+        {
+          label: WINDOW + '-post average',
+          data: rolling,
+          borderColor:'rgba(245,244,240,0.42)',
+          borderDash:[5,4], borderWidth:1.5,
+          pointRadius:0, fill:false, tension:0.35,
+        }
+      ]
     },
     options:{
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'nearest', intersect:false},
       plugins:{
-        legend:{display:false},
-        tooltip:{callbacks:{label: c => def.label + ': ' + def.fmt(c.raw)}}
+        legend:{
+          display:true, position:'bottom',
+          labels:{color:'rgba(245,244,240,0.5)', font:{size:10,family:'Space Mono'},
+                  boxWidth:22, boxHeight:2, padding:14, usePointStyle:false}
+        },
+        tooltip:{callbacks:{
+          title: items => points[items[0].dataIndex].label,
+          label: c => c.datasetIndex === 0
+            ? def.label + ': ' + def.fmt(c.raw)
+            : 'Running average: ' + def.fmt(c.raw)
+        }}
       },
       scales:{
-        x:{...AXIS, beginAtZero:true, ticks:{...AXIS.ticks, callback:def.fmt}},
-        y:{...AXIS, ticks:{...AXIS.ticks, font:{size:8,family:'Inter'}, autoSkip:false}}
+        x:{...AXIS, ticks:{...AXIS.ticks, maxRotation:0, autoSkipPadding:18}},
+        y:{...AXIS, beginAtZero:true, ticks:{...AXIS.ticks, callback:def.fmt}}
       },
-      onClick:(e,els)=>{ if(els.length) openModal(top[els[0].index].id); }
+      onClick:(e,els)=>{ if(els.length) openModal(points[els[0].index].id); }
     }
   });
 

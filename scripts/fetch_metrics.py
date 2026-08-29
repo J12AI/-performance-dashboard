@@ -231,6 +231,10 @@ def main():
             "timestamp": media.get("timestamp"),
             "permalink": media.get("permalink"),
             "thumbnail_url": media.get("thumbnail_url") or media.get("media_url"),
+            # Direct CDN video file, so the dashboard can play the reel in a
+            # native player instead of Instagram's light-mode embed widget.
+            # These URLs are signed and expire, which the daily run refreshes.
+            "media_url": media.get("media_url") if media.get("media_type") == "VIDEO" else None,
             "metrics": metrics,
             "last_updated": run_timestamp,
         })
