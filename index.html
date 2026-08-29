@@ -152,6 +152,54 @@
   .delta.up{color:var(--up);}
   .delta.down{color:var(--down);}
 
+  /* tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:26px 0 0;}
+  .tabs button{
+    background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);
+    padding:11px 16px;font-family:var(--mono);font-size:11px;letter-spacing:0.09em;
+    text-transform:uppercase;cursor:pointer;margin-bottom:-1px;
+  }
+  .tabs button:hover{color:var(--text);}
+  .tabs button.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  /* per-card metric toggle */
+  .card-toggle{
+    position:absolute;top:8px;right:8px;z-index:2;
+    background:rgba(17,17,17,0.82);backdrop-filter:blur(6px);
+    border:1px solid var(--border-strong);border-radius:5px;color:var(--muted);
+    font-family:var(--mono);font-size:9px;letter-spacing:0.05em;
+    padding:4px 7px;cursor:pointer;line-height:1;
+  }
+  .card-toggle:hover{color:var(--accent);border-color:var(--accent);}
+  .breakdown{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;
+    font-family:var(--mono);font-size:10px;color:var(--muted);
+  }
+  .breakdown b{color:var(--text);font-weight:700;}
+
+  /* compare */
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+  .panel-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+  .panel-head .t{font-family:var(--mono);font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--muted);}
+  .panel-head .n{font-family:var(--mono);font-size:10px;color:var(--faint);}
+  .chart-box{position:relative;height:420px;}
+  .chart-box.short{height:300px;}
+
+  /* modal embed */
+  .embed-toggle{
+    background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+    border-radius:7px;padding:9px 14px;font-family:var(--mono);font-size:11px;
+    letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;margin-bottom:16px;
+  }
+  .embed-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  .embed-wrap{display:none;margin-bottom:18px;border-radius:10px;overflow:hidden;background:#000;}
+  .embed-wrap.open{display:block;}
+  .embed-wrap iframe{width:100%;height:640px;border:0;display:block;}
+  .caveat{
+    font-size:11px;color:var(--faint);line-height:1.5;margin-top:10px;
+    padding-left:10px;border-left:2px solid var(--border);
+  }
+
   .empty-state,.loading{color:var(--muted);text-align:center;padding:60px 0;font-size:13px;}
 
   /* ---------- modal ---------- */
@@ -213,6 +261,12 @@
 
   <div class="stat-grid" id="statGrid"></div>
 
+  <div class="tabs">
+    <button id="tabBtnOverview" class="active">Overview</button>
+    <button id="tabBtnCompare">Compare all</button>
+  </div>
+
+<div id="tabOverview">
   <div class="section-head">
     <h2>Top performer</h2>
     <span class="hint" id="heroHint"></span>
@@ -221,7 +275,7 @@
 
   <div class="section-head">
     <h2>All posts</h2>
-    <span class="hint">click any post for its full breakdown</span>
+    <span class="hint">click any post for its full breakdown · <b>%</b> button on each card flips rates ↔ counts</span>
   </div>
 
   <div class="toolbar">
@@ -230,10 +284,16 @@
       <option value="views">Sort: Views</option>
       <option value="engRate">Sort: Engagement rate</option>
       <option value="saveRate">Sort: Save rate</option>
+      <option value="watch">Sort: Avg watch time</option>
       <option value="saves">Sort: Saves</option>
       <option value="shares">Sort: Shares</option>
       <option value="likes">Sort: Likes</option>
       <option value="timestamp">Sort: Newest</option>
+    </select>
+    <select id="type">
+      <option value="all">All formats</option>
+      <option value="REELS">Reels only</option>
+      <option value="FEED">Feed only</option>
     </select>
     <select id="range">
       <option value="all">All time</option>
@@ -259,6 +319,62 @@
   <div id="emptyState" class="empty-state" style="display:none;">Nothing matches that filter.</div>
 </div>
 
+<div id="tabCompare" style="display:none;">
+  <div class="toolbar">
+    <input type="text" id="cSearch" placeholder="Search captions…">
+    <select id="cMetric">
+      <option value="views">Metric: Views</option>
+      <option value="watch">Metric: Avg watch time</option>
+      <option value="engRate">Metric: Engagement rate</option>
+      <option value="saveRate">Metric: Save rate</option>
+      <option value="reach">Metric: Reach</option>
+      <option value="saves">Metric: Saves</option>
+      <option value="shares">Metric: Shares</option>
+      <option value="likes">Metric: Likes</option>
+    </select>
+    <select id="cType">
+      <option value="all">All formats</option>
+      <option value="REELS">Reels only</option>
+      <option value="FEED">Feed only</option>
+    </select>
+    <select id="cRange">
+      <option value="all">All time</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last 12 months</option>
+    </select>
+    <select id="cLimit">
+      <option value="15">Top 15</option>
+      <option value="25">Top 25</option>
+      <option value="999">All posts</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="t" id="cRankTitle">Every post, ranked</span>
+      <span class="n" id="cRankNote"></span>
+    </div>
+    <div class="chart-box"><canvas id="rankChart"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="t">Views vs. avg watch time</span>
+      <span class="n">each dot is a post · top-right is the sweet spot</span>
+    </div>
+    <div class="chart-box short"><canvas id="scatterChart"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="t">Growth over time · all posts</span>
+      <span class="n" id="cTrendNote"></span>
+    </div>
+    <div class="chart-box short"><canvas id="multiChart"></canvas></div>
+  </div>
+</div>
+
 </div>
 
 <div class="modal-backdrop" id="modalBackdrop">
@@ -271,6 +387,9 @@
 <script>
 let videos = [], history = [], stats = {}, viewMode = 'grid';
 let tableSort = {key:'views', dir:-1};
+let activeTab = 'overview';
+const cardCounts = new Set();   // card ids currently showing raw counts instead of rates
+const charts = {};              // one live Chart per canvas id
 
 /* ---------- formatting ---------- */
 function fmt(n){
@@ -317,6 +436,8 @@ function derive(){
       saveRate: reach ? (Number(m.saves)||0)/reach : 0,
       shareRate: reach ? (Number(m.shares)||0)/reach : 0,
       watch: m.avg_watch_time_sec,
+      // sorting needs a number; posts with no watch data sink to the bottom
+      watchSort: m.avg_watch_time_sec == null ? -1 : m.avg_watch_time_sec,
     };
   });
 
@@ -469,15 +590,22 @@ function captionText(v, len, fallback){
 }
 
 /* ---------- filtering ---------- */
-function currentSet(){
-  const q = document.getElementById('search').value.toLowerCase();
-  const range = document.getElementById('range').value;
+function filterSet(q, type, range){
   let out = videos.filter(v => (v.caption||'').toLowerCase().includes(q));
+  if(type !== 'all') out = out.filter(v => (v.media_product_type||'') === type);
   if(range !== 'all'){
     const cutoff = Date.now() - Number(range)*86400000;
     out = out.filter(v => v.timestamp && new Date(v.timestamp).getTime() >= cutoff);
   }
   return out;
+}
+
+function currentSet(){
+  return filterSet(
+    document.getElementById('search').value.toLowerCase(),
+    document.getElementById('type').value,
+    document.getElementById('range').value
+  );
 }
 
 function render(){
@@ -496,6 +624,7 @@ function renderGrid(set){
   const sortBy = document.getElementById('sortBy').value;
   const sorted = set.slice().sort((a,b)=>{
     if(sortBy === 'timestamp') return (b.timestamp||'').localeCompare(a.timestamp||'');
+    if(sortBy === 'watch') return b.d.watchSort - a.d.watchSort;
     return b.d[sortBy] - a.d[sortBy];
   });
 
@@ -508,19 +637,35 @@ function renderGrid(set){
     const tip = stats.medianViews
       ? `${ratio.toFixed(1)}× the median post's ${unit}`
       : '';
+    const counts = cardCounts.has(v.id);
     return `
     <div class="card" data-id="${v.id}" title="${tip}">
       <div class="thumb-wrap">
         <img class="thumb" src="${v.thumbnail_url||''}" loading="lazy" onerror="this.style.opacity=0">
         ${isTop ? '<span class="badge top">Top</span>' : ''}
+        <button class="card-toggle" data-toggle="${v.id}"
+                title="Switch between rates and raw counts">${counts ? '123' : '%'}</button>
       </div>
       <div class="card-body">
         <div class="card-caption">${captionText(v, 64)}</div>
         <div class="card-date">${v.timestamp ? new Date(v.timestamp).toLocaleDateString() : ''}</div>
         <div class="metric-row">
-          <span class="primary">${fmt(d.views)} ${stats.viewsAreReach?'reach':'views'}</span>
-          <span>${pct(d.engRate)} eng</span>
+          <span class="primary">${fmt(d.views)} ${unit}</span>
+          <span>${counts ? fmt(d.engagement)+' eng' : pct(d.engRate)+' eng'}</span>
         </div>
+        ${counts ? `
+        <div class="breakdown">
+          <span><b>${fmt(d.likes)}</b> likes</span>
+          <span><b>${fmt(d.comments)}</b> comments</span>
+          <span><b>${fmt(d.shares)}</b> shares</span>
+          <span><b>${fmt(d.saves)}</b> saves</span>
+          ${d.watch != null ? `<span><b>${d.watch}s</b> watch</span>` : ''}
+        </div>` : `
+        <div class="breakdown">
+          <span><b>${pct(d.saveRate)}</b> save rate</span>
+          <span><b>${pct(d.shareRate)}</b> share rate</span>
+          ${d.watch != null ? `<span><b>${d.watch}s</b> avg watch</span>` : ''}
+        </div>`}
         <div class="perfbar"><i class="${ratio>=1?'over':''}" style="width:${width}%"></i></div>
       </div>
     </div>`;
@@ -536,6 +681,7 @@ const COLS = [
   {key:'saveRate', label:'Save %',      sortable:true},
   {key:'saves',    label:'Saves',       sortable:true},
   {key:'shares',   label:'Shares',      sortable:true},
+  {key:'watchSort',label:'Avg Watch',   sortable:true},
   {key:'vsMedian', label:'vs Median',   sortable:true},
 ];
 
@@ -575,6 +721,7 @@ function renderTable(set){
       <td>${pct(d.saveRate)}</td>
       <td>${fmt(d.saves)}</td>
       <td>${fmt(d.shares)}</td>
+      <td>${d.watch != null ? d.watch+'s' : '—'}</td>
       <td class="delta ${vs && vs.up ? 'up':'down'}">${vs ? vs.text : '—'}</td>
     </tr>`;
   }).join('');
@@ -583,6 +730,37 @@ function renderTable(set){
 /* ---------- modal ---------- */
 let trendChart;
 
+function shortcode(permalink){
+  const m = (permalink||'').match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+const AXIS = {
+  ticks:{color:'rgba(245,244,240,0.4)',font:{size:9,family:'Space Mono'}},
+  grid:{color:'rgba(245,244,240,0.05)'}
+};
+
+function lineChart(canvasId, labels, data, label, color, fmtY){
+  if(charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart(document.getElementById(canvasId), {
+    type:'line',
+    data:{ labels, datasets:[{
+      label, data, borderColor:color,
+      backgroundColor:color.replace('rgb','rgba').replace(')',',0.12)'),
+      fill:true, tension:0.3, pointRadius: data.length <= 1 ? 5 : 3, borderWidth:2,
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:AXIS,
+        y:{...AXIS, beginAtZero:true,
+           ticks:{...AXIS.ticks, maxTicksLimit:5, callback:fmtY}}
+      }
+    }
+  });
+}
+
 function openModal(id){
   const v = videos.find(x => x.id === id);
   if(!v) return;
@@ -590,6 +768,8 @@ function openModal(id){
   const vs = ratioLabel(d.views, stats.medianViews);
   const vsEng = ratioLabel(d.engRate, stats.medianEng);
   const vsSave = ratioLabel(d.saveRate, stats.medianSave);
+
+  const code = shortcode(v.permalink);
 
   const tile = (l, val, delta) => `
     <div class="mstat">
@@ -612,11 +792,24 @@ function openModal(id){
       ${tile('Saves', fmt(d.saves), null)}
       ${d.watch != null ? tile('Avg Watch', d.watch+'s', null) : ''}
     </div>
+    ${code ? `<button class="embed-toggle" id="embedBtn">▶ Play the reel</button>
+    <div class="embed-wrap" id="embedWrap"></div>` : ''}
     <div class="chart-head">
       <span class="t">${stats.viewsAreReach?'Reach':'Views'} over time</span>
       <span class="n" id="chartNote"></span>
     </div>
-    <canvas id="trendCanvas" height="130"></canvas>
+    <div style="height:170px;"><canvas id="trendCanvas"></canvas></div>
+    ${d.watch != null ? `
+    <div class="chart-head">
+      <span class="t">Avg watch time over time</span>
+      <span class="n" id="watchNote"></span>
+    </div>
+    <div style="height:170px;"><canvas id="watchCanvas"></canvas></div>` : ''}
+    <div class="caveat">
+      Instagram's API reports totals only — it has no frame-by-frame retention curve,
+      so a drop-off graph synced to playback isn't something any tool can build on this data.
+      Avg watch time is the closest signal it exposes.
+    </div>
     ${v.permalink ? `<div style="margin-top:18px;"><a class="permalink" href="${v.permalink}" target="_blank" rel="noopener">View on Instagram →</a></div>` : ''}
   `;
   document.getElementById('modalBackdrop').classList.add('open');
@@ -628,37 +821,184 @@ function openModal(id){
     ? 'needs a few more daily runs to form a trend'
     : rows.length + ' days tracked';
 
-  const ctx = document.getElementById('trendCanvas');
-  if(trendChart) trendChart.destroy();
-  trendChart = new Chart(ctx, {
-    type:'line',
+  lineChart('trendCanvas',
+    rows.length ? rows.map(r => new Date(r.date).toLocaleDateString()) : ['—'],
+    rows.length ? rows.map(r => r.views) : [0],
+    'Views', 'rgb(91,141,239)', y => fmt(y));
+
+  if(d.watch != null){
+    const wRows = rows.filter(r => r.avg_watch_time_sec != null);
+    document.getElementById('watchNote').textContent = wRows.length <= 1
+      ? 'one reading so far'
+      : wRows.length + ' days tracked';
+    lineChart('watchCanvas',
+      wRows.length ? wRows.map(r => new Date(r.date).toLocaleDateString()) : ['—'],
+      wRows.length ? wRows.map(r => r.avg_watch_time_sec) : [d.watch],
+      'Avg watch (s)', 'rgb(91,214,160)', y => y + 's');
+  }
+
+  // Embed is loaded on demand — 43 of them on page load would be brutal.
+  const btn = document.getElementById('embedBtn');
+  if(btn){
+    btn.addEventListener('click', () => {
+      const wrap = document.getElementById('embedWrap');
+      if(wrap.classList.contains('open')){
+        wrap.classList.remove('open');
+        wrap.innerHTML = '';
+        btn.textContent = '▶ Play the reel';
+      } else {
+        wrap.innerHTML = `<iframe src="https://www.instagram.com/reel/${code}/embed/"
+          allowtransparency="true" allowfullscreen scrolling="no"></iframe>`;
+        wrap.classList.add('open');
+        btn.textContent = '✕ Hide the reel';
+      }
+    });
+  }
+}
+
+/* ---------- compare tab ---------- */
+const METRIC_DEFS = {
+  views:    {label:'Views',              get:d=>d.views,     fmt:fmt,            color:'rgb(91,141,239)'},
+  watch:    {label:'Avg watch time (s)', get:d=>d.watch??0,  fmt:v=>v+'s',       color:'rgb(91,214,160)'},
+  engRate:  {label:'Engagement rate',    get:d=>d.engRate,   fmt:v=>pct(v),      color:'rgb(198,148,240)'},
+  saveRate: {label:'Save rate',          get:d=>d.saveRate,  fmt:v=>pct(v),      color:'rgb(232,164,107)'},
+  reach:    {label:'Reach',              get:d=>d.reach,     fmt:fmt,            color:'rgb(120,180,230)'},
+  saves:    {label:'Saves',              get:d=>d.saves,     fmt:fmt,            color:'rgb(232,132,107)'},
+  shares:   {label:'Shares',             get:d=>d.shares,    fmt:fmt,            color:'rgb(240,200,120)'},
+  likes:    {label:'Likes',              get:d=>d.likes,     fmt:fmt,            color:'rgb(150,200,160)'},
+};
+
+function shortLabel(v){
+  const c = (v.caption||'').trim();
+  const base = c ? c.slice(0,34) + (c.length>34?'…':'')
+                 : (v.timestamp ? new Date(v.timestamp).toLocaleDateString() : 'Untitled');
+  return base;
+}
+
+function compareSet(){
+  const set = filterSet(
+    document.getElementById('cSearch').value.toLowerCase(),
+    document.getElementById('cType').value,
+    document.getElementById('cRange').value
+  );
+  const key = document.getElementById('cMetric').value;
+  const def = METRIC_DEFS[key];
+  return {def, key, sorted: set.slice().sort((a,b)=> def.get(b.d) - def.get(a.d))};
+}
+
+function renderCompare(){
+  const {def, key, sorted} = compareSet();
+  const limit = Number(document.getElementById('cLimit').value);
+  const top = sorted.slice(0, limit);
+
+  document.getElementById('cRankTitle').textContent = 'Every post, ranked by ' + def.label.toLowerCase();
+  document.getElementById('cRankNote').textContent =
+    top.length + ' of ' + sorted.length + ' shown';
+
+  // --- ranked bar ---
+  if(charts.rankChart) charts.rankChart.destroy();
+  charts.rankChart = new Chart(document.getElementById('rankChart'), {
+    type:'bar',
     data:{
-      labels: rows.length ? rows.map(r => new Date(r.date).toLocaleDateString()) : ['—'],
+      labels: top.map(shortLabel),
       datasets:[{
-        data: rows.length ? rows.map(r => r.views) : [0],
-        borderColor:'#5B8DEF',
-        backgroundColor:'rgba(91,141,239,0.12)',
-        fill:true, tension:0.3, pointRadius: rows.length <= 1 ? 5 : 3, borderWidth:2,
+        data: top.map(v => def.get(v.d)),
+        backgroundColor: top.map(v => v.id === (stats.top&&stats.top.id) ? 'rgb(91,214,160)' : def.color),
+        borderRadius:3, barThickness: top.length > 25 ? 8 : 14,
       }]
     },
     options:{
-      responsive:true,
-      plugins:{legend:{display:false}},
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label: c => def.label + ': ' + def.fmt(c.raw)}}
+      },
       scales:{
-        x:{ticks:{color:'rgba(245,244,240,0.4)',font:{size:9,family:'Space Mono'}},grid:{color:'rgba(245,244,240,0.05)'}},
-        y:{
-          beginAtZero:true,
-          ticks:{color:'rgba(245,244,240,0.4)',font:{size:9,family:'Space Mono'},
-                 maxTicksLimit:5, callback:v=>fmt(v)},
-          grid:{color:'rgba(245,244,240,0.05)'}
-        }
-      }
+        x:{...AXIS, beginAtZero:true, ticks:{...AXIS.ticks, callback:def.fmt}},
+        y:{...AXIS, ticks:{...AXIS.ticks, font:{size:8,family:'Inter'}, autoSkip:false}}
+      },
+      onClick:(e,els)=>{ if(els.length) openModal(top[els[0].index].id); }
+    }
+  });
+
+  // --- scatter: views vs watch time ---
+  const pts = sorted.filter(v => v.d.watch != null)
+    .map(v => ({x:v.d.watch, y:v.d.views, id:v.id, label:shortLabel(v)}));
+  if(charts.scatterChart) charts.scatterChart.destroy();
+  charts.scatterChart = new Chart(document.getElementById('scatterChart'), {
+    type:'scatter',
+    data:{datasets:[{
+      data: pts,
+      backgroundColor:'rgba(91,141,239,0.65)',
+      borderColor:'rgb(91,141,239)', pointRadius:5, pointHoverRadius:8,
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label: c => `${c.raw.label} — ${fmt(c.raw.y)} views, ${c.raw.x}s`}}
+      },
+      scales:{
+        x:{...AXIS, title:{display:true,text:'Avg watch time (s)',color:'rgba(245,244,240,0.4)',font:{size:9,family:'Space Mono'}}},
+        y:{...AXIS, beginAtZero:true, title:{display:true,text:'Views',color:'rgba(245,244,240,0.4)',font:{size:9,family:'Space Mono'}}, ticks:{...AXIS.ticks, callback:fmt}}
+      },
+      onClick:(e,els)=>{ if(els.length) openModal(pts[els[0].index].id); }
+    }
+  });
+
+  // --- multi-line growth ---
+  const days = [...new Set(history.map(h => (h.date||'').slice(0,10)).filter(Boolean))].sort();
+  const note = document.getElementById('cTrendNote');
+  note.textContent = days.length <= 1
+    ? 'only ' + days.length + ' day tracked — this fills in as the daily job runs'
+    : days.length + ' days tracked';
+
+  const series = top.slice(0, 12).map((v,i) => {
+    const byDate = {};
+    history.filter(h => h.id === v.id).forEach(h => { byDate[(h.date||'').slice(0,10)] = h; });
+    const hue = Math.round((i * 360) / 12);
+    return {
+      label: shortLabel(v),
+      data: days.map(dt => byDate[dt] ? (key === 'watch' ? byDate[dt].avg_watch_time_sec : byDate[dt].views) : null),
+      borderColor:`hsl(${hue} 65% 62%)`, backgroundColor:'transparent',
+      tension:0.3, pointRadius: days.length <= 1 ? 4 : 2, borderWidth:1.6, spanGaps:true,
+    };
+  });
+
+  if(charts.multiChart) charts.multiChart.destroy();
+  charts.multiChart = new Chart(document.getElementById('multiChart'), {
+    type:'line',
+    data:{labels:days, datasets:series},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'nearest', intersect:false},
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => `${c.dataset.label}: ${key==='watch'? c.raw+'s' : fmt(c.raw)}`}}},
+      scales:{x:AXIS, y:{...AXIS, beginAtZero:true, ticks:{...AXIS.ticks, callback: key==='watch' ? (y=>y+'s') : fmt}}}
     }
   });
 }
 
+function switchTab(tab){
+  activeTab = tab;
+  document.getElementById('tabOverview').style.display = tab === 'overview' ? '' : 'none';
+  document.getElementById('tabCompare').style.display  = tab === 'compare'  ? '' : 'none';
+  document.getElementById('tabBtnOverview').classList.toggle('active', tab === 'overview');
+  document.getElementById('tabBtnCompare').classList.toggle('active', tab === 'compare');
+  tab === 'compare' ? renderCompare() : render();
+}
+
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
+  // the per-card rate/count toggle must not also open the modal
+  const tog = e.target.closest('[data-toggle]');
+  if(tog){
+    e.stopPropagation();
+    const id = tog.dataset.toggle;
+    cardCounts.has(id) ? cardCounts.delete(id) : cardCounts.add(id);
+    render();
+    return;
+  }
+
   const row = e.target.closest('[data-id]');
   if(row) openModal(row.dataset.id);
 
@@ -677,6 +1017,11 @@ document.getElementById('modalBackdrop').addEventListener('click', e=>{
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape') document.getElementById('modalBackdrop').classList.remove('open');
 });
+document.getElementById('tabBtnOverview').addEventListener('click', ()=>switchTab('overview'));
+document.getElementById('tabBtnCompare').addEventListener('click', ()=>switchTab('compare'));
+['cSearch','cMetric','cType','cRange','cLimit'].forEach(id =>
+  document.getElementById(id).addEventListener(id==='cSearch'?'input':'change', renderCompare));
+document.getElementById('type').addEventListener('change', render);
 document.getElementById('search').addEventListener('input', render);
 document.getElementById('sortBy').addEventListener('change', render);
 document.getElementById('range').addEventListener('change', render);
